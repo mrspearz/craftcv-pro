@@ -239,7 +239,7 @@ function AppContent() {
 
   const handleSave = async () => {
     if (!currentResumeId) {
-      alert('Please create a new CV from the dashboard first');
+      console.log('Please create a new CV from the dashboard first');
       return;
     }
     try {
@@ -255,10 +255,9 @@ function AppContent() {
       });
 
       actions.saveResume();
-      alert('Resume saved successfully!');
+      console.log('Resume saved');
     } catch (error) {
       console.error('Error saving resume:', error);
-      alert('Error saving: ' + (error as any)?.message);
     }
   };
 
