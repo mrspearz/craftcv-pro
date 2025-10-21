@@ -1,0 +1,29 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#3730A3"/>
+    </linearGradient>
+    <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F8FAFC"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background with rounded corners -->
+  <rect width="32" height="32" rx="8" fill="url(#bgGradient)"/>
+  
+  <!-- Briefcase icon -->
+  <g transform="translate(6, 8)">
+    <!-- Briefcase body -->
+    <rect x="2" y="6" width="16" height="10" rx="2" stroke="url(#iconGradient)" stroke-width="1.5" fill="none"/>
+    <!-- Briefcase handle -->
+    <path d="M6 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="url(#iconGradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Briefcase lock -->
+    <rect x="9" y="10" width="2" height="2" fill="url(#iconGradient)" rx="0.5"/>
+  </g>
+  
+  <!-- Premium accent dot -->
+  <circle cx="26" cy="6" r="2.5" fill="#A855F7" opacity="0.8"/>
+</svg>

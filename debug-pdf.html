@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Debug Helper</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px 15px; margin: 5px; background: #007cba; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #005c8a; }
+        .output { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Resume Builder PDF Debug Helper</h1>
+    
+    <div class="section">
+        <h3>1. Clear Corrupted Data</h3>
+        <p>If you're getting image/PNG errors, this will clear potentially corrupted data:</p>
+        <button onclick="clearResumeData()">Clear Resume Data</button>
+        <div id="clearResult" class="output" style="display:none;"></div>
+    </div>
+
+    <div class="section">
+        <h3>2. Check Storage Usage</h3>
+        <p>Check what data is stored and how much space it's using:</p>
+        <button onclick="checkStorage()">Check Storage</button>
+        <div id="storageResult" class="output" style="display:none;"></div>
+    </div>
+
+    <div class="section">
+        <h3>3. Instructions</h3>
+        <ol>
+            <li>If you're getting PDF errors, try "Clear Resume Data" first</li>
+            <li>Go back to your resume builder: <a href="http://localhost:5174" target="_blank">http://localhost:5174</a></li>
+            <li>Re-enter your information (it should be much faster)</li>
+            <li>Try downloading PDF again</li>
+            <li>If still having issues, avoid uploading profile pictures for now</li>
+        </ol>
+    </div>
+
+    <script>
+        function clearResumeData() {
+            try {
+                // Clear all resume-related localStorage data
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('resume') || key.includes('app_state') || key.includes('auto_save'))) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+                
+                const resultDiv = document.getElementById('clearResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `✅ Cleared ${keysToRemove.length} items: ${keysToRemove.join(', ') || 'none found'}`;
+            } catch (error) {
+                const resultDiv = document.getElementById('clearResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        function checkStorage() {
+            try {
+                let total = 0;
+                let details = [];
+                
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key) {
+                        const value = localStorage.getItem(key);
+                        const size = value ? new Blob([value]).size : 0;
+                        total += size;
+                        
+                        if (key.includes('resume') || key.includes('app_state')) {
+                            details.push(`${key}: ${(size/1024).toFixed(2)} KB`);
+                        }
+                    }
+                }
+                
+                const resultDiv = document.getElementById('storageResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    Total localStorage: ${(total/1024).toFixed(2)} KB<br>
+                    Resume-related data:<br>
+                    ${details.length > 0 ? details.join('<br>') : 'No resume data found'}
+                `;
+            } catch (error) {
+                const resultDiv = document.getElementById('storageResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
