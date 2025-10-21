@@ -7,6 +7,7 @@ import { StyleCustomizer } from './components/StyleCustomizer';
 import { LandingPage } from './components/LandingPage';
 import { DevTools } from './components/DevTools';
 import { resumeService } from './utils/resumeService';
+import { supabase } from './lib/supabaseClient';
 import type { ColorScheme, FontPair } from './components/StyleCustomizer';
 import type { TemplateConfig } from './types';
 
@@ -194,7 +195,8 @@ function AppContent() {
   const { state, actions } = useResume();
   const [currentView, setCurrentView] = useState<'landing' | 'builder'>('builder');
   const [showDevTools, setShowDevTools] = useState(false);
-
+  const currentResumeId = localStorage.getItem('currentResumeId');
+  
   // Add keyboard shortcut to toggle dev tools
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -236,21 +238,27 @@ function AppContent() {
   };
 
   const handleSave = async () => {
+    if (!currentResumeId) {
+      alert('Please create a new CV from the dashboard first');
+      return;
+    }
     try {
-      const result = await resumeService.saveResume({
-        title: state.resumeData.personalInfo.fullName || 'My Resume',
-        templateId: state.selectedTemplate,
-        personalInfo: state.resumeData.personalInfo,
-        workExperience: state.resumeData.workExperience,
-        education: state.resumeData.education,
-        skills: state.resumeData.skills,
-        customizations: state.customizations,
+      // Update resume data
+      await supabase.from('resume_data').upsert({
+        resume_id: currentResumeId,
+        personal_info: state.resumeData.personalInfo,
+        work_experience: state.resumeData.workExperience || [],
+        education: state.resumeData.education || [],
+        skills: state.resumeData.skills || [],
+        customizations: state.customizations || {},
+        updated_at: new Date(),
       });
-      if (result.success) {
-        actions.saveResume();
-      }
+
+      actions.saveResume();
+      alert('Resume saved successfully!');
     } catch (error) {
       console.error('Error saving resume:', error);
+      alert('Error saving: ' + (error as any)?.message);
     }
   };
 

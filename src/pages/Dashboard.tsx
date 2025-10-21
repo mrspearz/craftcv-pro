@@ -39,7 +39,15 @@ export function Dashboard() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">My CVs</h2>
             <button
-              onClick={() => navigate('/builder')}
+              onClick={async () => {
+                const result = await resumeService.createNewResume();
+                if (result.success) {
+                  localStorage.setItem('currentResumeId', result.resumeId);
+                  navigate('/builder');
+                } else {
+                  alert('Error creating resume');
+                }
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-medium rounded-lg transition-all"
             >
               <Plus className="w-5 h-5" />

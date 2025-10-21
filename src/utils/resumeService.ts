@@ -11,6 +11,44 @@ export interface ResumeSaveData {
 }
 
 export const resumeService = {
+  async createNewResume() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) throw new Error('Not authenticated');
+
+      // Create new resume
+      const { data: newResume, error } = await supabase
+        .from('resumes')
+        .insert({
+          user_id: user.id,
+          title: `My Resume ${new Date().toLocaleDateString()}`,
+          template_id: 'modern',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Create empty resume data
+      const { error: dataError } = await supabase.from('resume_data').insert({
+        resume_id: newResume.id,
+        personal_info: {},
+        work_experience: [],
+        education: [],
+        skills: [],
+        customizations: {},
+      });
+
+      if (dataError) throw dataError;
+      return { success: true, resumeId: newResume.id };
+    } catch (error) {
+      console.error('Error creating resume:', error);
+      return { success: false, error };
+    }
+  },
   async saveResume(data: ResumeSaveData) {
     try {
       const {
