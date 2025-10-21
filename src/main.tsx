@@ -13,6 +13,7 @@ import { Settings } from './pages/Settings'
 import { Home } from './pages/Home'
 import { AdminLogin } from './pages/AdminLogin'
 import { AdminDashboard } from './pages/AdminDashboard'
+import { Pricing } from './pages/Pricing'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -23,6 +24,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/builder" element={<Builder />} />
           <Route path="/admin/login" element={<AdminLogin />} />

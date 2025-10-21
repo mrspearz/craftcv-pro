@@ -71,17 +71,39 @@ ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 
--- Allow public read for products
-CREATE POLICY "Anyone can view active products"
+-- Allow public read for products (only active ones)
+CREATE POLICY "Public can view active products"
   ON subscription_products FOR SELECT
   USING (active = true);
+
+-- Admin can do everything with products
+CREATE POLICY "Admin can manage products"
+  ON subscription_products FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM admin_users 
+    WHERE admin_users.email = auth.jwt() ->> 'email'
+  ));
 
 -- User subscriptions policies
 CREATE POLICY "Users can view their own subscriptions"
   ON user_subscriptions FOR SELECT
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Admin can view all subscriptions"
+  ON user_subscriptions FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM admin_users 
+    WHERE admin_users.email = auth.jwt() ->> 'email'
+  ));
+
 -- Orders policies
 CREATE POLICY "Users can view their own orders"
   ON orders FOR SELECT
   USING (auth.uid() = user_id);
+
+CREATE POLICY "Admin can view all orders"
+  ON orders FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM admin_users 
+    WHERE admin_users.email = auth.jwt() ->> 'email'
+  ));

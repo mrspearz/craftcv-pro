@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Users, ShoppingCart, DollarSign, Settings } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseAdmin } from '../lib/supabaseClient';
 
 export function AdminDashboard() {
   const navigate = useNavigate();
@@ -12,6 +12,23 @@ export function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [stripeKeys, setStripeKeys] = useState({ publishable: '', secret: '' });
   const [loading, setLoading] = useState(true);
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [productForm, setProductForm] = useState({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+
+  // Check if user is admin
+  useEffect(() => {
+    const email = localStorage.getItem('adminEmail');
+    const token = localStorage.getItem('adminToken');
+    if (email && token) {
+      setAdminEmail(email);
+      setIsAdmin(true);
+    } else {
+      navigate('/admin/login');
+    }
+  }, [navigate]);
 
   useEffect(() => {
     loadData();
@@ -19,23 +36,43 @@ export function AdminDashboard() {
 
   const loadData = async () => {
     try {
-      // Load users count
-      const { data: authData, count } = await supabase.auth.admin.listUsers();
-      setUserCount(count || 0);
+      // Load users from auth.users using admin API
+      try {
+        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+        if (!error && users) {
+          setAllUsers(users);
+          setUserCount(users.length);
+        } else {
+          console.warn('Could not load users:', error);
+        }
+      } catch (err) {
+        console.error('Error listing users:', err);
+      }
 
       // Load revenue
-      const { data: orders } = await supabase.from('orders').select('amount');
+      const { data: orders } = await supabaseAdmin.from('orders').select('amount');
       const revenue = orders?.reduce((sum, order) => sum + (order.amount || 0), 0) || 0;
       setTotalRevenue(revenue);
 
-      // Load products
-      const { data: productsData } = await supabase.from('subscription_products').select('*');
+      // Load products - show all for admin
+      const { data: productsData, error: productsError } = await supabaseAdmin
+        .from('subscription_products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (productsError) {
+        console.error('Products error:', productsError);
+      }
       setProducts(productsData || []);
 
       // Load stripe settings
-      const { data: stripeData } = await supabase.from('stripe_settings').select('*').single();
-      if (stripeData) {
-        setStripeKeys({ publishable: stripeData.publishable_key || '', secret: stripeData.secret_key || '' });
+      try {
+        const { data: stripeData } = await supabaseAdmin.from('stripe_settings').select('*').single();
+        if (stripeData) {
+          setStripeKeys({ publishable: stripeData.publishable_key || '', secret: stripeData.secret_key || '' });
+        }
+      } catch (err) {
+        console.warn('Stripe settings not found');
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -61,21 +98,32 @@ export function AdminDashboard() {
   };
 
   const handleAddProduct = async () => {
-    const name = prompt('Product name:');
-    if (!name) return;
-    const price = prompt('Price:');
-    if (!price) return;
+    if (!productForm.name || !productForm.price) {
+      alert('Please fill in name and price');
+      return;
+    }
     
     try {
-      await supabase.from('subscription_products').insert({
-        name,
-        price: parseFloat(price),
-        description: 'Premium subscription',
-        billing_period: 'monthly',
-      });
-      alert('Product created');
-      loadData();
+      const { data, error } = await supabaseAdmin.from('subscription_products').insert({
+        name: productForm.name,
+        price: parseFloat(productForm.price),
+        description: productForm.description,
+        billing_period: productForm.billing_period,
+        active: true,
+      }).select();
+      
+      if (error) {
+        console.error('Insert error:', error);
+        alert('Error: ' + error.message);
+        return;
+      }
+      
+      alert('Product created successfully');
+      setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
+      setShowProductForm(false);
+      await loadData();
     } catch (error) {
+      console.error('Error:', error);
       alert('Error: ' + (error as any)?.message);
     }
   };
@@ -83,7 +131,7 @@ export function AdminDashboard() {
   const handleDeleteProduct = async (id: string) => {
     if (!window.confirm('Delete this product?')) return;
     try {
-      await supabase.from('subscription_products').delete().eq('id', id);
+      await supabaseAdmin.from('subscription_products').delete().eq('id', id);
       alert('Product deleted');
       loadData();
     } catch (error) {
@@ -97,15 +145,15 @@ export function AdminDashboard() {
       return;
     }
     try {
-      const { data: existing } = await supabase.from('stripe_settings').select('*').single().catch(() => ({ data: null }));
+      const { data: existing } = await supabaseAdmin.from('stripe_settings').select('*').single().catch(() => ({ data: null }));
       
       if (existing) {
-        await supabase.from('stripe_settings').update({
+        await supabaseAdmin.from('stripe_settings').update({
           publishable_key: stripeKeys.publishable,
           secret_key: stripeKeys.secret,
         }).eq('id', existing.id);
       } else {
-        await supabase.from('stripe_settings').insert({
+        await supabaseAdmin.from('stripe_settings').insert({
           publishable_key: stripeKeys.publishable,
           secret_key: stripeKeys.secret,
         });
@@ -116,7 +164,7 @@ export function AdminDashboard() {
     }
   };
 
-  if (loading) {
+  if (loading || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-violet-500 border-t-transparent"></div>
@@ -128,7 +176,10 @@ export function AdminDashboard() {
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
       <div className="bg-slate-900/50 border-b border-violet-500/20 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+          <p className="text-sm text-slate-400 mt-1">Logged in as: {adminEmail}</p>
+        </div>
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
@@ -196,17 +247,37 @@ export function AdminDashboard() {
                 <thead className="bg-slate-800/50 border-b border-violet-500/20">
                   <tr>
                     <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">Email</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">Name</th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">Created</th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-slate-300">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Note: Displaying users would require admin API */}
-                  <tr className="border-b border-slate-800">
-                    <td colSpan={3} className="px-6 py-4 text-slate-400 text-center">
-                      User list requires Supabase Admin API
-                    </td>
-                  </tr>
+                  {allUsers.length > 0 ? (
+                    allUsers.map((user: any) => (
+                      <tr key={user.id} className="border-b border-slate-800 hover:bg-slate-800/30">
+                        <td className="px-6 py-4 text-slate-300">{user.email}</td>
+                        <td className="px-6 py-4 text-slate-300">{user.user_metadata?.full_name || user.email?.split('@')[0] || 'N/A'}</td>
+                        <td className="px-6 py-4 text-slate-400 text-sm">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-b border-slate-800">
+                      <td colSpan={4} className="px-6 py-4 text-slate-400 text-center">
+                        No users found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -215,18 +286,86 @@ export function AdminDashboard() {
 
         {tab === 'products' && (
           <div>
-            <button
-              onClick={handleAddProduct}
-              className="mb-4 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-colors"
-            >
-              + Add Product
-            </button>
+            {!showProductForm ? (
+              <button
+                onClick={() => setShowProductForm(true)}
+                className="mb-4 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-colors"
+              >
+                + Add Product
+              </button>
+            ) : (
+              <div className="mb-6 bg-slate-900/50 border border-violet-500/20 rounded-lg p-6 max-w-md">
+                <h3 className="text-white font-semibold mb-4">Create New Product</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Product Name</label>
+                    <input
+                      type="text"
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                      placeholder="e.g., Pro Plan"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Price (USD)</label>
+                    <input
+                      type="number"
+                      value={productForm.price}
+                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                      placeholder="9.99"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                    <textarea
+                      value={productForm.description}
+                      onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                      placeholder="Product description"
+                      rows={3}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Billing Period</label>
+                    <select
+                      value={productForm.billing_period}
+                      onChange={(e) => setProductForm({ ...productForm, billing_period: e.target.value })}
+                      className="w-full px-4 py-2 bg-slate-800/50 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddProduct}
+                      className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Create Product
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowProductForm(false);
+                        setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
+                      }}
+                      className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="grid gap-4">
               {products.map((product) => (
                 <div key={product.id} className="bg-slate-900/50 border border-violet-500/20 rounded-lg p-4 flex justify-between items-center">
                   <div>
                     <h3 className="text-white font-semibold">{product.name}</h3>
-                    <p className="text-slate-400 text-sm">${product.price}/{product.billing_period}</p>
+                    <p className="text-slate-400 text-sm">USD ${product.price}/{product.billing_period}</p>
+                    {product.description && <p className="text-slate-500 text-xs mt-1">{product.description}</p>}
                   </div>
                   <button
                     onClick={() => handleDeleteProduct(product.id)}

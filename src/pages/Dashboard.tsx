@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
 import { resumeService } from '../utils/resumeService';
-import { Edit2, Trash2, Plus } from 'lucide-react';
+import { Edit2, Trash2, Plus, CreditCard } from 'lucide-react';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -29,9 +29,18 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-slate-950 py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-slate-400">Manage your resumes</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
+            <p className="text-slate-400">Manage your resumes</p>
+          </div>
+          <button
+            onClick={() => navigate('/pricing')}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-medium rounded-lg transition-all"
+          >
+            <CreditCard className="w-5 h-5" />
+            Upgrade
+          </button>
         </div>
 
         {/* My CVs Section */}
