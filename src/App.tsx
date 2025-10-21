@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ResumeProvider, useResume } from './contexts/ResumeContext';
 import { Layout } from './components/Layout';
 import { ResumePreview } from './components/ResumePreview';
@@ -7,6 +6,7 @@ import { CollapsibleResumeForm } from './components/CollapsibleResumeForm';
 import { StyleCustomizer } from './components/StyleCustomizer';
 import { LandingPage } from './components/LandingPage';
 import { DevTools } from './components/DevTools';
+import { resumeService } from './utils/resumeService';
 import type { ColorScheme, FontPair } from './components/StyleCustomizer';
 import type { TemplateConfig } from './types';
 
@@ -191,25 +191,9 @@ const mockTemplates: TemplateConfig[] = [
 ];
 
 function AppContent() {
-  const navigate = useNavigate();
   const { state, actions } = useResume();
-  const [currentView, setCurrentView] = useState<'landing' | 'builder'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'builder'>('builder');
   const [showDevTools, setShowDevTools] = useState(false);
-  
-  // Check if user is signed in and redirect to builder
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const auth = (window as any).useAuth?.();
-        if (auth?.user) {
-          setCurrentView('builder');
-        }
-      } catch (e) {
-        // Not in auth context
-      }
-    };
-    checkAuth();
-  }, []);
 
   // Add keyboard shortcut to toggle dev tools
   useEffect(() => {
@@ -229,9 +213,9 @@ function AppContent() {
     setCurrentView('builder');
   };
   
-  // Handle navigation back to landing page (optional)
-  const handleBackToLanding = () => {
-    setCurrentView('landing');
+  // Handle navigation back to dashboard
+  const handleBackToDashboard = () => {
+    window.location.href = '/dashboard';
   };
 
   // Show landing page if current view is landing
@@ -251,8 +235,23 @@ function AppContent() {
     actions.setShowPreview(!state.ui.showPreview);
   };
 
-  const handleSave = () => {
-    actions.saveResume();
+  const handleSave = async () => {
+    try {
+      const result = await resumeService.saveResume({
+        title: state.resumeData.personalInfo.fullName || 'My Resume',
+        templateId: state.selectedTemplate,
+        personalInfo: state.resumeData.personalInfo,
+        workExperience: state.resumeData.workExperience,
+        education: state.resumeData.education,
+        skills: state.resumeData.skills,
+        customizations: state.customizations,
+      });
+      if (result.success) {
+        actions.saveResume();
+      }
+    } catch (error) {
+      console.error('Error saving resume:', error);
+    }
   };
 
   const handleColorChange = (scheme: ColorScheme) => {
@@ -297,7 +296,7 @@ function AppContent() {
       onSave={handleSave}
       isDirty={state.ui.isDirty}
       lastSaved={state.ui.lastSaved}
-      onBackToLanding={handleBackToLanding}
+      onBackToLanding={handleBackToDashboard}
     >
       {/* Mobile Layout - Stacked */}
       <div className="flex flex-col lg:flex-row h-full">
