@@ -194,9 +194,6 @@ function AppContent() {
   const { state, actions } = useResume();
   const [currentView, setCurrentView] = useState<'landing' | 'builder'>('builder');
   const [showDevTools, setShowDevTools] = useState(false);
-  const [currentResumeId, setCurrentResumeId] = useState<string | null>(
-    localStorage.getItem('currentResumeId')
-  );
 
   // Add keyboard shortcut to toggle dev tools
   useEffect(() => {
@@ -218,7 +215,6 @@ function AppContent() {
   
   // Handle navigation back to dashboard
   const handleBackToDashboard = () => {
-    localStorage.removeItem('currentResumeId');
     window.location.href = '/dashboard';
   };
 
@@ -241,29 +237,20 @@ function AppContent() {
 
   const handleSave = async () => {
     try {
-      const saveData = {
+      const result = await resumeService.saveResume({
         title: state.resumeData.personalInfo.fullName || 'My Resume',
-        templateId: state.selectedTemplate || 'modern',
+        templateId: state.selectedTemplate,
         personalInfo: state.resumeData.personalInfo,
-        workExperience: state.resumeData.workExperience || [],
-        education: state.resumeData.education || [],
-        skills: state.resumeData.skills || [],
-        customizations: state.customizations || {},
-      };
-      console.log('Saving resume:', saveData);
-      const result = await resumeService.saveResume(saveData);
-      console.log('Save result:', result);
+        workExperience: state.resumeData.workExperience,
+        education: state.resumeData.education,
+        skills: state.resumeData.skills,
+        customizations: state.customizations,
+      });
       if (result.success) {
         actions.saveResume();
-        localStorage.setItem('currentResumeId', result.resumeId);
-        setCurrentResumeId(result.resumeId);
-        alert('Resume saved successfully!');
-      } else {
-        alert('Error saving resume: ' + (result.error as any)?.message);
       }
     } catch (error) {
       console.error('Error saving resume:', error);
-      alert('Error: ' + (error as any)?.message);
     }
   };
 
