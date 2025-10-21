@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ResumeProvider, useResume } from './contexts/ResumeContext';
 import { Layout } from './components/Layout';
 import { ResumePreview } from './components/ResumePreview';
@@ -190,9 +191,25 @@ const mockTemplates: TemplateConfig[] = [
 ];
 
 function AppContent() {
+  const navigate = useNavigate();
   const { state, actions } = useResume();
-  const [currentView, setCurrentView] = useState<'landing' | 'builder'>('builder');
+  const [currentView, setCurrentView] = useState<'landing' | 'builder'>('landing');
   const [showDevTools, setShowDevTools] = useState(false);
+  
+  // Check if user is signed in and redirect to builder
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const auth = (window as any).useAuth?.();
+        if (auth?.user) {
+          setCurrentView('builder');
+        }
+      } catch (e) {
+        // Not in auth context
+      }
+    };
+    checkAuth();
+  }, []);
 
   // Add keyboard shortcut to toggle dev tools
   useEffect(() => {
