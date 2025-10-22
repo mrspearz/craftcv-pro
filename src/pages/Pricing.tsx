@@ -21,9 +21,11 @@ export function Pricing() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [stripePublishableKey, setStripePublishableKey] = useState<string>('');
 
   useEffect(() => {
     loadProducts();
+    loadStripeSettings();
   }, []);
 
   const loadProducts = async () => {
@@ -46,10 +48,32 @@ export function Pricing() {
     }
   };
 
+  const loadStripeSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('stripe_settings')
+        .select('publishable_key')
+        .single();
+
+      if (error) {
+        console.error('Error loading Stripe settings:', error);
+      } else if (data?.publishable_key) {
+        setStripePublishableKey(data.publishable_key);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  };
+
   const handleSubscribe = async (product: Product) => {
     if (!user) {
       alert('Please log in to subscribe');
       navigate('/login');
+      return;
+    }
+
+    if (!stripePublishableKey) {
+      alert('Stripe is not configured. Please contact support.');
       return;
     }
 
@@ -68,6 +92,8 @@ export function Pricing() {
             productId: product.id,
             priceId: product.stripe_price_id,
             userId: user.id,
+            customerEmail: user.email,
+            frontendUrl: window.location.origin,
           }),
         }
       );
@@ -75,11 +101,12 @@ export function Pricing() {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
 
-      // Redirect to Stripe checkout
-      const stripe = await loadStripe(
-        import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-      );
-      await stripe?.redirectToCheckout({ sessionId: data.sessionId });
+      // Redirect to Stripe checkout using session URL
+      if (data.sessionUrl) {
+        window.location.href = data.sessionUrl;
+      } else {
+        throw new Error('No checkout URL received from server');
+      }
     } catch (error) {
       console.error('Error:', error);
       alert('Failed to start checkout: ' + (error as any).message);

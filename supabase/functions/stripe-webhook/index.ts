@@ -2,10 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@13.0.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2023-10-16",
-});
-
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -18,6 +14,25 @@ serve(async (req) => {
   const body = await req.text();
 
   try {
+    // Fetch Stripe secret key from database
+    const { data: stripeSettings, error: settingsError } = await supabase
+      .from("stripe_settings")
+      .select("secret_key")
+      .single();
+
+    if (settingsError || !stripeSettings?.secret_key) {
+      console.error("Stripe not configured:", settingsError);
+      return new Response(
+        JSON.stringify({ error: "Stripe is not configured" }),
+        { status: 500 }
+      );
+    }
+
+    // Initialize Stripe with the fetched secret key
+    const stripe = new Stripe(stripeSettings.secret_key, {
+      apiVersion: "2023-10-16",
+    });
+
     const event = JSON.parse(body);
 
     console.log("Webhook event:", event.type);

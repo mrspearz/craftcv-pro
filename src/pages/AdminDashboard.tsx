@@ -104,11 +104,38 @@ export function AdminDashboard() {
     }
     
     try {
+      // First, create product in Stripe via edge function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-stripe-product`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'create',
+            name: productForm.name,
+            description: productForm.description,
+            price: parseFloat(productForm.price),
+            billing_period: productForm.billing_period,
+          }),
+        }
+      );
+
+      const stripeResult = await response.json();
+      if (stripeResult.error) {
+        throw new Error(stripeResult.error);
+      }
+
+      // Then save to database with Stripe IDs
       const { data, error } = await supabaseAdmin.from('subscription_products').insert({
         name: productForm.name,
         price: parseFloat(productForm.price),
         description: productForm.description,
         billing_period: productForm.billing_period,
+        stripe_product_id: stripeResult.stripeProductId,
+        stripe_price_id: stripeResult.stripePriceId,
         active: true,
       }).select();
       
@@ -118,7 +145,7 @@ export function AdminDashboard() {
         return;
       }
       
-      alert('Product created successfully');
+      alert('Product created successfully in both Stripe and database!');
       setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
       setShowProductForm(false);
       await loadData();
@@ -128,11 +155,35 @@ export function AdminDashboard() {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (!window.confirm('Delete this product?')) return;
+  const handleDeleteProduct = async (id: string, stripeProductId?: string) => {
+    if (!window.confirm('Delete this product from both Stripe and database?')) return;
     try {
+      // Delete from Stripe first if we have a stripe_product_id
+      if (stripeProductId) {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-stripe-product`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+            body: JSON.stringify({
+              action: 'delete',
+              stripeProductId: stripeProductId,
+            }),
+          }
+        );
+
+        const result = await response.json();
+        if (result.error) {
+          console.warn('Stripe deletion warning:', result.error);
+        }
+      }
+
+      // Then delete from database
       await supabaseAdmin.from('subscription_products').delete().eq('id', id);
-      alert('Product deleted');
+      alert('Product deleted successfully');
       loadData();
     } catch (error) {
       alert('Error: ' + (error as any)?.message);
@@ -145,14 +196,20 @@ export function AdminDashboard() {
       return;
     }
     try {
-      const { data: existing } = await supabaseAdmin.from('stripe_settings').select('*').single().catch(() => ({ data: null }));
+      // Check if settings already exist
+      const { data: existing, error: selectError } = await supabaseAdmin
+        .from('stripe_settings')
+        .select('*')
+        .single();
       
-      if (existing) {
+      if (existing && !selectError) {
+        // Update existing record
         await supabaseAdmin.from('stripe_settings').update({
           publishable_key: stripeKeys.publishable,
           secret_key: stripeKeys.secret,
         }).eq('id', existing.id);
       } else {
+        // Insert new record
         await supabaseAdmin.from('stripe_settings').insert({
           publishable_key: stripeKeys.publishable,
           secret_key: stripeKeys.secret,
@@ -368,7 +425,7 @@ export function AdminDashboard() {
                     {product.description && <p className="text-slate-500 text-xs mt-1">{product.description}</p>}
                   </div>
                   <button
-                    onClick={() => handleDeleteProduct(product.id)}
+                    onClick={() => handleDeleteProduct(product.id, product.stripe_product_id)}
                     className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
                   >
                     Delete
