@@ -76,6 +76,15 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
             
+            {/* Mobile Preview Button */}
+            <button
+              onClick={onTogglePreview}
+              className="sm:hidden flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg border border-violet-500/30 transition-all"
+              title={showPreview ? 'Hide Preview' : 'Show Preview'}
+            >
+              {showPreview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </button>
+            
             {/* Mobile Download Button */}
             <button
               onClick={onExportPDF}
