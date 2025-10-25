@@ -231,7 +231,22 @@ function AppContent() {
   };
 
   const handleExportPDF = async () => {
-    await actions.exportToPDF();
+    // If preview is not visible, temporarily show it for PDF export
+    const wasPreviewHidden = !state.ui.showPreview;
+    if (wasPreviewHidden) {
+      actions.setShowPreview(true);
+      // Wait a bit for the preview to render
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    try {
+      await actions.exportToPDF();
+    } finally {
+      // Hide preview again if it was hidden before on mobile
+      if (wasPreviewHidden && window.innerWidth < 1024) {
+        actions.setShowPreview(false);
+      }
+    }
   };
 
   const handleTogglePreview = () => {
