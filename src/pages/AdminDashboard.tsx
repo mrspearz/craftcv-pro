@@ -35,41 +35,30 @@ export function AdminDashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isAdmin) {
+      loadData();
+    }
+  }, [isAdmin]);
 
   const loadData = async () => {
-    // Only allow admin@admin.com to load data
-    if (adminEmail !== 'admin@admin.com') {
-      console.warn('Unauthorized access attempt');
-      return;
-    }
-
     try {
       // Load users from profiles table
-      try {
-        console.log('Loading user profiles...');
-        
-        const { data: profiles, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (error) {
-          console.error('Error loading profiles:', error);
-          // Try to show some data even if profiles don't exist
-          setAllUsers([]);
-          setUserCount(0);
-        } else if (profiles) {
-          console.log('Successfully loaded profiles:', profiles.length);
-          setAllUsers(profiles);
-          setUserCount(profiles.length);
-        } else {
-          setAllUsers([]);
-          setUserCount(0);
-        }
-      } catch (err) {
-        console.error('Exception while listing profiles:', err);
+      console.log('Loading user profiles...');
+      
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading profiles:', error);
+        setAllUsers([]);
+        setUserCount(0);
+      } else if (profiles) {
+        console.log('Successfully loaded profiles:', profiles.length);
+        setAllUsers(profiles);
+        setUserCount(profiles.length);
+      } else {
         setAllUsers([]);
         setUserCount(0);
       }
