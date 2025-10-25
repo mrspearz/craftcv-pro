@@ -190,10 +190,28 @@ export function Pricing() {
                       </div>
                     ))
                   ) : (
-                    <div className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-slate-300">Premium Features</span>
-                    </div>
+                    <>
+                      <div className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-slate-300">Unlimited resume downloads</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-slate-300">Access to all premium templates</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-slate-300">AI-powered content suggestions</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-slate-300">Priority customer support</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-slate-300">Export in multiple formats (PDF, Word, etc.)</span>
+                      </div>
+                    </>
                   )}
                 </div>
 

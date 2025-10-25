@@ -111,7 +111,8 @@ export const createDefaultAppState = (): AppState => ({
     spacing: 'normal',
   },
   ui: {
-    showPreview: true,
+    // Only show preview by default on desktop (screen width >= 1024px)
+    showPreview: typeof window !== 'undefined' ? window.innerWidth >= 1024 : false,
     editingSection: null,
     isDirty: false,
     lastSaved: null,

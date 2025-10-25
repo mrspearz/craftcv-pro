@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, ShoppingCart, DollarSign, Settings } from 'lucide-react';
+import { LogOut, Users, ShoppingCart, DollarSign, Settings, Edit2 } from 'lucide-react';
 import { supabase, supabaseAdmin } from '../lib/supabaseClient';
 
 export function AdminDashboard() {
@@ -13,6 +13,7 @@ export function AdminDashboard() {
   const [stripeKeys, setStripeKeys] = useState({ publishable: '', secret: '' });
   const [loading, setLoading] = useState(true);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [productForm, setProductForm] = useState({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -89,12 +90,24 @@ export function AdminDashboard() {
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
-      await supabase.auth.admin.deleteUser(userId);
+      await supabaseAdmin.auth.admin.deleteUser(userId);
       alert('User deleted successfully');
-      loadData();
+      await loadData();
     } catch (error) {
       alert('Error deleting user: ' + (error as any)?.message);
     }
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      price: product.price.toString(),
+      description: product.description || '',
+      billing_period: product.billing_period,
+      currency: 'USD',
+    });
+    setShowProductForm(true);
   };
 
   const handleAddProduct = async () => {
@@ -104,50 +117,73 @@ export function AdminDashboard() {
     }
     
     try {
-      // First, create product in Stripe via edge function
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-stripe-product`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-          body: JSON.stringify({
-            action: 'create',
+      if (editingProduct) {
+        // Update existing product
+        const { error } = await supabaseAdmin
+          .from('subscription_products')
+          .update({
             name: productForm.name,
-            description: productForm.description,
             price: parseFloat(productForm.price),
+            description: productForm.description,
             billing_period: productForm.billing_period,
-          }),
+          })
+          .eq('id', editingProduct.id);
+        
+        if (error) {
+          console.error('Update error:', error);
+          alert('Error: ' + error.message);
+          return;
         }
-      );
+        
+        alert('Product updated successfully!');
+      } else {
+        // Create new product in Stripe via edge function
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-stripe-product`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+            body: JSON.stringify({
+              action: 'create',
+              name: productForm.name,
+              description: productForm.description,
+              price: parseFloat(productForm.price),
+              billing_period: productForm.billing_period,
+            }),
+          }
+        );
 
-      const stripeResult = await response.json();
-      if (stripeResult.error) {
-        throw new Error(stripeResult.error);
-      }
+        const stripeResult = await response.json();
+        if (stripeResult.error) {
+          throw new Error(stripeResult.error);
+        }
 
-      // Then save to database with Stripe IDs
-      const { data, error } = await supabaseAdmin.from('subscription_products').insert({
-        name: productForm.name,
-        price: parseFloat(productForm.price),
-        description: productForm.description,
-        billing_period: productForm.billing_period,
-        stripe_product_id: stripeResult.stripeProductId,
-        stripe_price_id: stripeResult.stripePriceId,
-        active: true,
-      }).select();
-      
-      if (error) {
-        console.error('Insert error:', error);
-        alert('Error: ' + error.message);
-        return;
+        // Then save to database with Stripe IDs
+        const { data, error } = await supabaseAdmin.from('subscription_products').insert({
+          name: productForm.name,
+          price: parseFloat(productForm.price),
+          description: productForm.description,
+          billing_period: productForm.billing_period,
+          stripe_product_id: stripeResult.stripeProductId,
+          stripe_price_id: stripeResult.stripePriceId,
+          active: true,
+        }).select();
+        
+        if (error) {
+          console.error('Insert error:', error);
+          alert('Error: ' + error.message);
+          return;
+        }
+        
+        alert('Product created successfully in both Stripe and database!');
       }
       
-      alert('Product created successfully in both Stripe and database!');
       setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
       setShowProductForm(false);
+      setEditingProduct(null);
       await loadData();
     } catch (error) {
       console.error('Error:', error);
@@ -352,7 +388,9 @@ export function AdminDashboard() {
               </button>
             ) : (
               <div className="mb-6 bg-slate-900/50 border border-violet-500/20 rounded-lg p-6 max-w-md">
-                <h3 className="text-white font-semibold mb-4">Create New Product</h3>
+                <h3 className="text-white font-semibold mb-4">
+                  {editingProduct ? 'Edit Product' : 'Create New Product'}
+                </h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Product Name</label>
@@ -401,11 +439,12 @@ export function AdminDashboard() {
                       onClick={handleAddProduct}
                       className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
                     >
-                      Create Product
+                      {editingProduct ? 'Update Product' : 'Create Product'}
                     </button>
                     <button
                       onClick={() => {
                         setShowProductForm(false);
+                        setEditingProduct(null);
                         setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
                       }}
                       className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
@@ -424,12 +463,21 @@ export function AdminDashboard() {
                     <p className="text-slate-400 text-sm">USD ${product.price}/{product.billing_period}</p>
                     {product.description && <p className="text-slate-500 text-xs mt-1">{product.description}</p>}
                   </div>
-                  <button
-                    onClick={() => handleDeleteProduct(product.id, product.stripe_product_id)}
-                    className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Delete
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditProduct(product)}
+                      className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id, product.stripe_product_id)}
+                      className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

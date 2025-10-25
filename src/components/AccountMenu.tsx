@@ -32,10 +32,10 @@ export function AccountMenu() {
   // Show logout and settings if authenticated
   if (user) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         <button
           onClick={() => navigate('/settings')}
-          className="p-2 text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+          className="hidden sm:block p-2 text-slate-300 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
           title="Settings"
         >
           <Settings className="w-5 h-5" />
@@ -43,10 +43,10 @@ export function AccountMenu() {
         <button
           onClick={handleSignOut}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
         >
-          <LogOut className="w-4 h-4" />
-          {loading ? 'Logging out...' : 'Logout'}
+          <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>{loading ? 'Logging out...' : 'Logout'}</span>
         </button>
       </div>
     );
