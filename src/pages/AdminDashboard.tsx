@@ -37,28 +37,34 @@ export function AdminDashboard() {
 
   const loadData = async () => {
     try {
-      // Load users from auth.users using admin API
+      // Load users from profiles table instead of auth.users
+      // This is more secure and doesn't require service role on client
       try {
-        console.log('Attempting to load users with admin API...');
-        console.log('Service role key available:', !!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+        console.log('Attempting to load user profiles...');
         
-        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
         
-        console.log('User load result:', { usersCount: users?.length, error });
+        console.log('Profiles load result:', { count: profiles?.length, error });
         
         if (error) {
-          console.error('Error loading users:', error);
-          alert('Failed to load users: ' + error.message);
-        } else if (users) {
-          console.log('Successfully loaded users:', users.length);
-          setAllUsers(users);
-          setUserCount(users.length);
+          console.error('Error loading profiles:', error);
+          // Don't alert, just log - profiles table might not exist yet
+        } else if (profiles) {
+          console.log('Successfully loaded profiles:', profiles.length);
+          setAllUsers(profiles);
+          setUserCount(profiles.length);
         } else {
-          console.warn('No users returned');
+          console.warn('No profiles returned');
+          setAllUsers([]);
+          setUserCount(0);
         }
       } catch (err) {
-        console.error('Exception while listing users:', err);
-        alert('Exception loading users: ' + (err as any).message);
+        console.error('Exception while listing profiles:', err);
+        setAllUsers([]);
+        setUserCount(0);
       }
 
       // Load revenue
@@ -101,7 +107,25 @@ export function AdminDashboard() {
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
-      await supabaseAdmin.auth.admin.deleteUser(userId);
+      // Call edge function to delete user (requires service role on server)
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ userId }),
+        }
+      );
+      
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      
       alert('User deleted successfully');
       await loadData();
     } catch (error) {
@@ -360,10 +384,12 @@ export function AdminDashboard() {
                   {allUsers.length > 0 ? (
                     allUsers.map((user: any) => (
                       <tr key={user.id} className="border-b border-slate-800 hover:bg-slate-800/30">
-                        <td className="px-6 py-4 text-slate-300">{user.email}</td>
-                        <td className="px-6 py-4 text-slate-300">{user.user_metadata?.full_name || user.email?.split('@')[0] || 'N/A'}</td>
+                        <td className="px-6 py-4 text-slate-300">{user.email || 'No email'}</td>
+                        <td className="px-6 py-4 text-slate-300">
+                          {user.full_name || user.display_name || user.email?.split('@')[0] || 'N/A'}
+                        </td>
                         <td className="px-6 py-4 text-slate-400 text-sm">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                         </td>
                         <td className="px-6 py-4">
                           <button
@@ -378,7 +404,7 @@ export function AdminDashboard() {
                   ) : (
                     <tr className="border-b border-slate-800">
                       <td colSpan={4} className="px-6 py-4 text-slate-400 text-center">
-                        No users found
+                        No users found. Users will appear here after they sign up.
                       </td>
                     </tr>
                   )}
