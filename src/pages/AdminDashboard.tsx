@@ -19,13 +19,16 @@ export function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
 
-  // Check if user is admin
+  // Check if user is admin (hardcoded for admin@admin.com)
   useEffect(() => {
     const email = localStorage.getItem('adminEmail');
     const token = localStorage.getItem('adminToken');
-    if (email && token) {
+    if (email === 'admin@admin.com' && token) {
       setAdminEmail(email);
       setIsAdmin(true);
+    } else if (email && token) {
+      alert('Access denied. Only admin@admin.com can access this page.');
+      navigate('/admin/login');
     } else {
       navigate('/admin/login');
     }
@@ -36,28 +39,32 @@ export function AdminDashboard() {
   }, []);
 
   const loadData = async () => {
+    // Only allow admin@admin.com to load data
+    if (adminEmail !== 'admin@admin.com') {
+      console.warn('Unauthorized access attempt');
+      return;
+    }
+
     try {
-      // Load users from profiles table instead of auth.users
-      // This is more secure and doesn't require service role on client
+      // Load users from profiles table
       try {
-        console.log('Attempting to load user profiles...');
+        console.log('Loading user profiles...');
         
         const { data: profiles, error } = await supabase
           .from('profiles')
           .select('*')
           .order('created_at', { ascending: false });
         
-        console.log('Profiles load result:', { count: profiles?.length, error });
-        
         if (error) {
           console.error('Error loading profiles:', error);
-          // Don't alert, just log - profiles table might not exist yet
+          // Try to show some data even if profiles don't exist
+          setAllUsers([]);
+          setUserCount(0);
         } else if (profiles) {
           console.log('Successfully loaded profiles:', profiles.length);
           setAllUsers(profiles);
           setUserCount(profiles.length);
         } else {
-          console.warn('No profiles returned');
           setAllUsers([]);
           setUserCount(0);
         }
