@@ -39,15 +39,26 @@ export function AdminDashboard() {
     try {
       // Load users from auth.users using admin API
       try {
+        console.log('Attempting to load users with admin API...');
+        console.log('Service role key available:', !!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+        
         const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
-        if (!error && users) {
+        
+        console.log('User load result:', { usersCount: users?.length, error });
+        
+        if (error) {
+          console.error('Error loading users:', error);
+          alert('Failed to load users: ' + error.message);
+        } else if (users) {
+          console.log('Successfully loaded users:', users.length);
           setAllUsers(users);
           setUserCount(users.length);
         } else {
-          console.warn('Could not load users:', error);
+          console.warn('No users returned');
         }
       } catch (err) {
-        console.error('Error listing users:', err);
+        console.error('Exception while listing users:', err);
+        alert('Exception loading users: ' + (err as any).message);
       }
 
       // Load revenue

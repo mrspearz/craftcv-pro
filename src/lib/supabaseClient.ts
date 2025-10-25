@@ -8,7 +8,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.');
 }
 
+console.log('Supabase URL:', supabaseUrl);
+console.log('Anon key loaded:', !!supabaseAnonKey);
 console.log('Service role key loaded:', !!supabaseServiceRoleKey);
+if (!supabaseServiceRoleKey) {
+  console.warn('WARNING: Service role key is not set. Admin features will not work!');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
