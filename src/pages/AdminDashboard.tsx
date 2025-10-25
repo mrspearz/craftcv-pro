@@ -14,7 +14,7 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
-  const [productForm, setProductForm] = useState({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
+  const [productForm, setProductForm] = useState({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD', stripe_price_id: '' });
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -137,6 +137,7 @@ export function AdminDashboard() {
       description: product.description || '',
       billing_period: product.billing_period,
       currency: 'USD',
+      stripe_price_id: product.stripe_price_id || '',
     });
     setShowProductForm(true);
   };
@@ -149,7 +150,40 @@ export function AdminDashboard() {
     
     try {
       if (editingProduct) {
-        // Update existing product
+        // Update product in Stripe if it has stripe IDs
+        let newPriceId = editingProduct.stripe_price_id;
+        
+        if (editingProduct.stripe_product_id) {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-stripe-product`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+              },
+              body: JSON.stringify({
+                action: 'update',
+                name: productForm.name,
+                description: productForm.description,
+                price: parseFloat(productForm.price),
+                billing_period: productForm.billing_period,
+                stripeProductId: editingProduct.stripe_product_id,
+                stripePriceId: editingProduct.stripe_price_id,
+              }),
+            }
+          );
+
+          const stripeResult = await response.json();
+          if (stripeResult.error) {
+            throw new Error(stripeResult.error);
+          }
+          
+          // Use the new price ID from Stripe
+          newPriceId = stripeResult.stripePriceId;
+        }
+        
+        // Update existing product in database
         const { error } = await supabaseAdmin
           .from('subscription_products')
           .update({
@@ -157,6 +191,7 @@ export function AdminDashboard() {
             price: parseFloat(productForm.price),
             description: productForm.description,
             billing_period: productForm.billing_period,
+            stripe_price_id: newPriceId,
           })
           .eq('id', editingProduct.id);
         
@@ -212,7 +247,7 @@ export function AdminDashboard() {
         alert('Product created successfully in both Stripe and database!');
       }
       
-      setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
+      setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD', stripe_price_id: '' });
       setShowProductForm(false);
       setEditingProduct(null);
       await loadData();
@@ -467,6 +502,18 @@ export function AdminDashboard() {
                       <option value="yearly">Yearly</option>
                     </select>
                   </div>
+                  {editingProduct && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Stripe Price ID</label>
+                      <input
+                        type="text"
+                        value={productForm.stripe_price_id}
+                        onChange={(e) => setProductForm({ ...productForm, stripe_price_id: e.target.value })}
+                        className="w-full px-4 py-2 bg-slate-800/50 border border-violet-500/20 rounded-lg text-white focus:outline-none focus:border-violet-500"
+                        placeholder="price_..."
+                      />
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddProduct}
@@ -478,7 +525,7 @@ export function AdminDashboard() {
                       onClick={() => {
                         setShowProductForm(false);
                         setEditingProduct(null);
-                        setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD' });
+                        setProductForm({ name: '', price: '', description: '', billing_period: 'monthly', currency: 'USD', stripe_price_id: '' });
                       }}
                       className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
                     >
@@ -495,6 +542,12 @@ export function AdminDashboard() {
                     <h3 className="text-white font-semibold">{product.name}</h3>
                     <p className="text-slate-400 text-sm">USD ${product.price}/{product.billing_period}</p>
                     {product.description && <p className="text-slate-500 text-xs mt-1">{product.description}</p>}
+                    <p className="text-xs mt-2">
+                      <span className="text-slate-500">Stripe Price ID: </span>
+                      <span className={product.stripe_price_id ? "text-green-400" : "text-red-400"}>
+                        {product.stripe_price_id || 'MISSING'}
+                      </span>
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <button

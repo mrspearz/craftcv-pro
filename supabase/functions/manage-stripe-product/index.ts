@@ -43,14 +43,15 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    const { action, name, description, price, billing_period, stripeProductId } = await req.json();
+    const { action, name, description, price, billing_period, stripeProductId, stripePriceId } = await req.json();
 
     if (action === "create") {
       // Create product in Stripe
-      const product = await stripe.products.create({
-        name: name,
-        description: description || "",
-      });
+      const productData: any = { name: name };
+      if (description) {
+        productData.description = description;
+      }
+      const product = await stripe.products.create(productData);
 
       // Create price in Stripe
       const stripePrice = await stripe.prices.create({
@@ -66,6 +67,55 @@ serve(async (req) => {
         JSON.stringify({
           stripeProductId: product.id,
           stripePriceId: stripePrice.id,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    } else if (action === "update") {
+      // Update product in Stripe
+      if (stripeProductId) {
+        const updateData: any = { name: name };
+        if (description) {
+          updateData.description = description;
+        }
+        await stripe.products.update(stripeProductId, updateData);
+      }
+
+      // Create new price if price or billing period changed
+      // Note: Stripe prices are immutable, so we create a new one
+      let newPriceId = stripePriceId;
+      if (stripeProductId && price && billing_period) {
+        const newPrice = await stripe.prices.create({
+          product: stripeProductId,
+          unit_amount: Math.round(price * 100),
+          currency: "usd",
+          recurring: {
+            interval: billing_period === "yearly" ? "year" : "month",
+          },
+        });
+        newPriceId = newPrice.id;
+
+        // Archive old price if it exists
+        if (stripePriceId) {
+          try {
+            await stripe.prices.update(stripePriceId, {
+              active: false,
+            });
+          } catch (e) {
+            console.warn("Could not archive old price:", e);
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          stripeProductId: stripeProductId,
+          stripePriceId: newPriceId,
         }),
         {
           status: 200,
